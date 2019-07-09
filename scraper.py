@@ -28,28 +28,28 @@ def get_cities(processed_data):
     us_locations = processed_data[0]
     return us_locations.find_all('li')
 
-def check_city(cities_list):
-    city = raw_input('Enter city to check: ')
-    for c in cities_list:
-        if city in c.text:
-            print 'yes', c.text
+#TODO: work on this more
+def check_city(cities_list, city='new york'):
+    for idx, elem in enumerate(cities_list):
+        if city in elem.text:
+            print idx, elem.text
     # print cities[10]
-    # city_link = cities[10].find('a')
+    # city_link = cities[10].find('ya')
     # print city_link['href']
-
-    #TODO: add functionality for checking specific city
-    pass
+    
 
 
 data = process_url(start_endpoint, 'div', 'colmask')
 cities = get_cities(data)
 
+location = raw_input('Enter city to check: ')
+check_city(cities, )
 
-check_city(cities)
 
 
-query = raw_input('Enter search term: ')
-search_query = '?query={}&is_paid=all'.format(query)
+
+#query = raw_input('Enter search term: ')
+#search_query = '?query={}&is_paid=all'.format(query)
 
 '''
 
