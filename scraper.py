@@ -6,7 +6,6 @@ import random
 
 ua = UserAgent()
 
-
 wait_time = random.randint(30, 120) 
 # print 'header is {} and initial wait time is {} secs'.format(ua.random, wait_time)
 
@@ -43,11 +42,11 @@ def check_city(cities_list, city='new york'):
 data = process_url(start_endpoint, 'div', 'colmask')
 cities = get_cities(data)
 
-location = raw_input('Enter city to check: ')
+location = input('Enter city to check: ')
 check_city(cities)
 
 if location == 'durham':
-    print 'yes'
+    print('yes')
 
 
 
