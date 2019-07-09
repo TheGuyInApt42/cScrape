@@ -31,8 +31,9 @@ def get_cities(processed_data):
 #TODO: work on this more
 def check_city(cities_list, city='new york'):
     for idx, elem in enumerate(cities_list):
-        if city in elem.text:
-            print idx, elem.text
+        pass
+        #if city in elem.text:
+         #   print idx, elem.text
     # print cities[10]
     # city_link = cities[10].find('ya')
     # print city_link['href']
@@ -43,8 +44,10 @@ data = process_url(start_endpoint, 'div', 'colmask')
 cities = get_cities(data)
 
 location = raw_input('Enter city to check: ')
-check_city(cities, )
+check_city(cities)
 
+if location == 'durham':
+    print 'yes'
 
 
 
