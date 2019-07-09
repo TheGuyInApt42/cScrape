@@ -6,33 +6,52 @@ import random
 
 ua = UserAgent()
 
-header = {'User-Agent':str(ua.random)} # get random header string
 
 wait_time = random.randint(30, 120) 
-print 'header is {} and initial wait time is {} secs'.format(ua.random, wait_time)
+# print 'header is {} and initial wait time is {} secs'.format(ua.random, wait_time)
 
 start_endpoint = 'https://www.craigslist.org/about/sites'
-
-result = requests.get(start_endpoint, headers=header)
-content = result.content
-
-soup = BeautifulSoup(content, features='html.parser')
-divs = soup.find_all('div', {'class': 'colmask'})
-us_locations =divs[0]
-cities = us_locations.find_all('li')
-
-
-# print cities[10]
-# city_link = cities[10].find('a')
-# print city_link['href']
-
-#TODO: add functionality for checking specific city
-
 gigs_param = 'd/computer-gigs/search/cpg'
+
+
+def process_url(url, tag, className):
+    header = {'User-Agent':str(ua.random)} # get random header string
+    result = requests.get(url, headers=header)
+    content = result.content
+
+    soup = BeautifulSoup(content, features='html.parser')
+    return soup.find_all(tag, {'class': className})
+    
+
+
+def get_cities(processed_data):
+    us_locations = processed_data[0]
+    return us_locations.find_all('li')
+
+def check_city(cities_list):
+    city = raw_input('Enter city to check: ')
+    for c in cities_list:
+        if city in c.text:
+            print 'yes', c.text
+    # print cities[10]
+    # city_link = cities[10].find('a')
+    # print city_link['href']
+
+    #TODO: add functionality for checking specific city
+    pass
+
+
+data = process_url(start_endpoint, 'div', 'colmask')
+cities = get_cities(data)
+
+
+check_city(cities)
+
 
 query = raw_input('Enter search term: ')
 search_query = '?query={}&is_paid=all'.format(query)
 
+'''
 
 for i in range(0,len(cities)):
     time.sleep(wait_time) #wait between 30 - 2 minutes before each
@@ -44,14 +63,10 @@ for i in range(0,len(cities)):
     gigs_url =  '{}{}'.format(city_link['href'], gigs_param)
     complete_url = '{}{}'.format(gigs_url, search_query)
 
-    res = requests.get(complete_url, headers=header)
-    data = res.content
-    newsoup = BeautifulSoup(data, features='html.parser')
+    info = process_url(complete_url, 'p', 'result-info')
 
-    results = newsoup.find_all('p', {'class': 'result-info'})
-
-    if results:
-        for r in results:
+    if info:
+        for r in info:
             time.sleep(wait_time) #wait between 30 - 2 minutes before each again
             print 'Wait time in second loop is {} seconds'.format(wait_time)
             post_time = r.find('time').attrs['datetime']
@@ -59,3 +74,4 @@ for i in range(0,len(cities)):
             post_id = r.find('a').attrs['data-id']
             print post_id, post_time, title, current_city
             wait_time = random.randint(30, 120) 
+'''
