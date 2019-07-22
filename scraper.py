@@ -3,7 +3,7 @@ This script allows searching of Craigslist computer gigs either manually searchi
 or automatically searching every city listed in the US.
 
 '''
-
+import argparse
 from bs4 import BeautifulSoup
 import requests
 from fake_useragent import UserAgent
@@ -11,6 +11,13 @@ import time
 import random
 import datetime
 from pymongo import MongoClient
+
+ap = argparse.ArgumentParser()
+# add argument var for running manual script
+ap.add_argument("-t", "--type", help="flag to run manually or auto")
+args = vars(ap.parse_args())
+print("Running {} script".format(args["type"]))
+
 
 ua = UserAgent() #instantiate user agent object for setting user agent strings
 
@@ -121,11 +128,11 @@ def doSearch(cities_list, wait_time, search_query, search_type='auto'):
     elif search_type == 'auto':
         for i in range(0,len(cities_list)):
             print('Current wait time for next result is {} secs'.format(wait_time))
-            print('Checking {}'.format(current_city))# show what city is being checked
             time.sleep(wait_time) #wait between 30 - 1 minutes before each
             
             city_link = cities_list[i].find('a')
             current_city = cities_list[i].text
+            print('Checking {}'.format(current_city))# show what city is being checked
             gigs_url =  '{}{}'.format(city_link['href'], gigs_param)
             complete_url = '{}{}'.format(gigs_url, search_query)
             info = process_url(complete_url, 'p', 'result-info')
@@ -141,6 +148,7 @@ cities = get_cities(data)
 search_term = input('Enter search term: ')
 search_query = '?query={}&is_paid=all'.format(search_term)
 
-doSearch(cities, wait_time, search_query)
+
+doSearch(cities, wait_time, search_query, args["type"])
 
 # TODO: add progress bar/counter
