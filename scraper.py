@@ -13,10 +13,11 @@ import datetime
 from pymongo import MongoClient
 
 ap = argparse.ArgumentParser()
+ap.add_argument("-t", "--target", help="flag for searching either gigs or web jobs")
 # add argument var for running manual script
-ap.add_argument("-t", "--type", help="flag to run manually or auto")
+ap.add_argument("-s", "--style", help="flag to run manually or auto")
 args = vars(ap.parse_args())
-print("Running {} script".format(args["type"]))
+print("Running {} script on {}".format(args["style"], args["target"]))
 
 
 ua = UserAgent() #instantiate user agent object for setting user agent strings
@@ -31,6 +32,7 @@ wait_time = random.randint(30, 60) #set wait time for random time between 30 - 6
 
 start_endpoint = 'https://www.craigslist.org/about/sites' # Craigslist locations url
 gigs_param = 'd/computer-gigs/search/cpg' # url parameter that gets appended for computer gigs 
+web_jobs_param = 'd/web-html-info-design/search/web' # url parameter that gets appended for web jobs
 
 
 def process_url(url, tag, className):
@@ -84,8 +86,9 @@ def get_result_rows(results, city, search_type='auto'):
             post_time = result.find('time').attrs['datetime']
             title = result.find('a').text
             post_id = result.find('a').attrs['data-id']
+            link = result.find('a')['href']
             if search_type == 'manual':
-                print('The position is {} in {} was posted on {}'.format(title, city, post_time))
+                print('Position: {}    Date Posted: {}    Link: {}'.format(title, post_time, link))
 
             else:
                 #gig object to insert into database
@@ -109,7 +112,7 @@ def get_result_rows(results, city, search_type='auto'):
         print('No results found.')
 
 #TODO: think about adding search params i.e search titles only
-def doSearch(cities_list, wait_time, search_query, search_type='auto'):
+def doSearch(cities_list, wait_time, search_term, search_target, search_type='auto'):
     '''
     Performs either targeted search or automatic search of all cities
     Takes in list of cities, initial wait time, term to search for, and whether search is manual or auto
@@ -120,8 +123,14 @@ def doSearch(cities_list, wait_time, search_query, search_type='auto'):
         city_link = cities_list[city_index].find('a')
         current_city = cities_list[city_index].text
         print('Checking {}'.format(current_city)) # show what city is being checked
-        gigs_url =  '{}{}'.format(city_link['href'], gigs_param) # append computer gig parameter to city link
-        complete_url = '{}{}'.format(gigs_url, search_query)
+
+        if search_target == 'gigs':
+            url =  '{}{}'.format(city_link['href'], gigs_param) # append computer gig parameter to city link
+            search_query = '?query={}&is_paid=all'.format(search_term)
+        else: 
+            url = '{}{}'.format(city_link['href'], web_jobs_param)
+            search_query = '?query={}'.format(search_term)
+        complete_url = '{}{}'.format(url, search_query)
         info = process_url(complete_url, 'p', 'result-info')
         get_result_rows(info, current_city,'manual')
     
@@ -133,8 +142,13 @@ def doSearch(cities_list, wait_time, search_query, search_type='auto'):
             city_link = cities_list[i].find('a')
             current_city = cities_list[i].text
             print('Checking {}'.format(current_city))# show what city is being checked
-            gigs_url =  '{}{}'.format(city_link['href'], gigs_param)
-            complete_url = '{}{}'.format(gigs_url, search_query)
+            if search_target == 'gigs':
+                url =  '{}{}'.format(city_link['href'], gigs_param) # append computer gig parameter to city link
+                search_query = '?query={}&is_paid=all'.format(search_term)
+            else: 
+                url = '{}{}'.format(city_link['href'], web_jobs_param)
+                search_query = '?query={}'.format(search_term)
+            complete_url = '{}{}'.format(url, search_query)
             info = process_url(complete_url, 'p', 'result-info')
             get_result_rows(info, current_city)
             wait_time = random.randint(30, 60) 
@@ -146,9 +160,6 @@ cities = get_cities(data)
 
 
 search_term = input('Enter search term: ')
-search_query = '?query={}&is_paid=all'.format(search_term)
-
-
-doSearch(cities, wait_time, search_query, args["type"])
+doSearch(cities, wait_time, search_term, args["target"], args["style"])
 
 # TODO: add progress bar/counter
