@@ -4,7 +4,7 @@ A script to check computer gigs in each city listed on Craigslist either automat
 
 The script primarily uses BeautifulSoup and requests. It also uses PyMongo to store unique gigs in database. 
 
-# Usage
+## Usage
 
 In order to run the script, run the script with argument for either auto search or manual search, e.g
 python scraper.py -t manual will run the script for targeted search. It will ask for search term, e.g "developer" and 
