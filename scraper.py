@@ -15,7 +15,7 @@ from pymongo import MongoClient
 ap = argparse.ArgumentParser()
 ap.add_argument("-t", "--target", help="flag for searching either gigs or web jobs")
 # add argument var for running manual script
-ap.add_argument("-s", "--style", help="flag to run manually or auto")
+ap.add_argument("-s", "--style", help="flag to run single, multiple, or all cities search")
 args = vars(ap.parse_args())
 print("Running {} script on {}".format(args["style"], args["target"]))
 
@@ -71,11 +71,11 @@ def get_city_index(cities_list, city='new york'):
         if city in elem.text:
             return idx
 
-def get_result_rows(results, city, search_type='auto'):
+def get_result_rows(results, city, search_type='all'):
     '''
     Checks if there are results and if so, then loops through each result while waiting a random time in between
     Inserts row info into database if it is not already in db
-    Takes in list of rows, current city being processed and whether search type is auto or manual
+    Takes in list of rows, current city being processed and whether search type is single, multiple or all
     '''
     wait_time = 5 # wait 5 secs between each iteration (should be on same page so dont have to fire anymore new requests)
     if results:
@@ -87,10 +87,10 @@ def get_result_rows(results, city, search_type='auto'):
             title = result.find('a').text
             post_id = result.find('a').attrs['data-id']
             link = result.find('a')['href']
-            if search_type == 'manual':
+            if search_type == 'single':
                 print('Position: {}    Date Posted: {}    Link: {}'.format(title, post_time, link))
-
-            else:
+            # FIXME: add case for multi city search
+            elif search_type == 'all':
                 #gig object to insert into database
                 gig = {
                     "c_id": post_id,
@@ -111,30 +111,37 @@ def get_result_rows(results, city, search_type='auto'):
     else:
         print('No results found.')
 
+def process_city():
+    pass
+
 #TODO: think about adding search params i.e search titles only
-def doSearch(cities_list, wait_time, search_term, search_target, search_type='auto'):
+def doSearch(cities_list, wait_time, search_term, search_target, search_type='all'):
     '''
     Performs either targeted search or automatic search of all cities
-    Takes in list of cities, initial wait time, term to search for, and whether search is manual or auto
+    Takes in list of cities, initial wait time, term to search for, and whether search is single, multiple, or all
     '''
-    if search_type == 'manual':
+    if search_type == 'single':
         location = input('Enter city to check: ')
         city_index = get_city_index(cities_list, location)
-        city_link = cities_list[city_index].find('a')
-        current_city = cities_list[city_index].text
-        print('Checking {}'.format(current_city)) # show what city is being checked
+        if city_index: #if city is on craigslist
+            city_link = cities_list[city_index].find('a')
+            current_city = cities_list[city_index].text
+            print('Checking {}'.format(current_city)) # show what city is being checked
 
-        if search_target == 'gigs':
-            url =  '{}{}'.format(city_link['href'], gigs_param) # append computer gig parameter to city link
-            search_query = '?query={}&is_paid=all'.format(search_term)
+            if search_target == 'gigs':
+                url =  '{}{}'.format(city_link['href'], gigs_param) # append computer gig parameter to city link
+                search_query = '?query={}&is_paid=all'.format(search_term)
+            else: 
+                url = '{}{}'.format(city_link['href'], web_jobs_param)
+                search_query = '?query={}'.format(search_term)
+            complete_url = '{}{}'.format(url, search_query)
+            info = process_url(complete_url, 'p', 'result-info')
+            get_result_rows(info, current_city,'single')
+        
         else: 
-            url = '{}{}'.format(city_link['href'], web_jobs_param)
-            search_query = '?query={}'.format(search_term)
-        complete_url = '{}{}'.format(url, search_query)
-        info = process_url(complete_url, 'p', 'result-info')
-        get_result_rows(info, current_city,'manual')
+            print('Sorry, city not found on Craigslist')
     
-    elif search_type == 'auto':
+    elif search_type == 'all':
         for i in range(0,len(cities_list)):
             print('Current wait time for next result is {} secs'.format(wait_time))
             time.sleep(wait_time) #wait between 30 - 1 minutes before each
@@ -153,6 +160,31 @@ def doSearch(cities_list, wait_time, search_term, search_target, search_type='au
             get_result_rows(info, current_city)
             wait_time = random.randint(30, 60) 
     
+    else:
+        locations = list(map(str, input('Enter cities to check: ').split(', ')))
+        print(locations)
+        for city in locations:
+            city_index = get_city_index(cities_list, city)
+            if city_index: #if city is on craigslist
+                city_link = cities_list[city_index].find('a')
+                current_city = cities_list[city_index].text
+                print('Checking {}'.format(current_city)) # show what city is being checked
+
+                if search_target == 'gigs':
+                    url =  '{}{}'.format(city_link['href'], gigs_param) # append computer gig parameter to city link
+                    search_query = '?query={}&is_paid=all'.format(search_term)
+                else: 
+                    url = '{}{}'.format(city_link['href'], web_jobs_param)
+                    search_query = '?query={}'.format(search_term)
+                complete_url = '{}{}'.format(url, search_query)
+                info = process_url(complete_url, 'p', 'result-info')
+                get_result_rows(info, current_city,'single')
+            
+            else: 
+                print('Sorry, city not found on Craigslist')
+    
+
+
 
 ''' Start script '''
 data = process_url(start_endpoint, 'div', 'colmask')
@@ -163,3 +195,4 @@ search_term = input('Enter search term: ')
 doSearch(cities, wait_time, search_term, args["target"], args["style"])
 
 # TODO: add progress bar/counter
+# TODO: thinking about multiple search terms i.e ['developer', 'freelance']
