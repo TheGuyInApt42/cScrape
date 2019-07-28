@@ -71,11 +71,25 @@ def get_city_index(cities_list, city='new york'):
         if city in elem.text:
             return idx
 
+
+def process_city(target, city, link, term, searchtype):
+    print('Checking {}'.format(city))# show what city is being checked
+    if target == 'gigs':
+        url =  '{}{}'.format(link['href'], gigs_param) # append computer gig parameter to city link
+        search_query = '?query={}&is_paid=all'.format(term)
+    else: 
+        url = '{}{}'.format(link['href'], web_jobs_param)
+        search_query = '?query={}'.format(term)
+    complete_url = '{}{}'.format(url, search_query)
+    info = process_url(complete_url, 'p', 'result-info')
+    get_result_rows(info, city, searchtype)
+
+
 def get_result_rows(results, city, search_type='all'):
     '''
     Checks if there are results and if so, then loops through each result while waiting a random time in between
     Inserts row info into database if it is not already in db
-    Takes in list of rows, current city being processed and whether search type is single, multiple or all
+    Takes in list of rows, current city being processed and whether search type is specific or all
     '''
     wait_time = 5 # wait 5 secs between each iteration (should be on same page so dont have to fire anymore new requests)
     if results:
@@ -87,9 +101,9 @@ def get_result_rows(results, city, search_type='all'):
             title = result.find('a').text
             post_id = result.find('a').attrs['data-id']
             link = result.find('a')['href']
-            if search_type == 'single':
+            if search_type == 'specific':
                 print('Position: {}    Date Posted: {}    Link: {}'.format(title, post_time, link))
-            # FIXME: add case for multi city search
+     
             elif search_type == 'all':
                 #gig object to insert into database
                 gig = {
@@ -111,35 +125,24 @@ def get_result_rows(results, city, search_type='all'):
     else:
         print('No results found.')
 
-def process_city():
-    pass
 
 #TODO: think about adding search params i.e search titles only
 def doSearch(cities_list, wait_time, search_term, search_target, search_type='all'):
     '''
     Performs either targeted search or automatic search of all cities
-    Takes in list of cities, initial wait time, term to search for, and whether search is single, multiple, or all
+    Takes in list of cities, initial wait time, term to search for, and whether search is specific or all
     '''
-    if search_type == 'single':
-        location = input('Enter city to check: ')
-        city_index = get_city_index(cities_list, location)
-        if city_index: #if city is on craigslist
-            city_link = cities_list[city_index].find('a')
-            current_city = cities_list[city_index].text
-            print('Checking {}'.format(current_city)) # show what city is being checked
-
-            if search_target == 'gigs':
-                url =  '{}{}'.format(city_link['href'], gigs_param) # append computer gig parameter to city link
-                search_query = '?query={}&is_paid=all'.format(search_term)
+    if search_type == 'specific':
+        locations = list(map(str, input('Enter cities to check: ').split(', ')))
+        for city in locations:
+            city_index = get_city_index(cities_list, city)
+            if city_index: #if city is on craigslist
+                city_link = cities_list[city_index].find('a')
+                current_city = cities_list[city_index].text
+                process_city(search_target, current_city, city_link, search_term, search_type)
+            
             else: 
-                url = '{}{}'.format(city_link['href'], web_jobs_param)
-                search_query = '?query={}'.format(search_term)
-            complete_url = '{}{}'.format(url, search_query)
-            info = process_url(complete_url, 'p', 'result-info')
-            get_result_rows(info, current_city,'single')
-        
-        else: 
-            print('Sorry, city not found on Craigslist')
+                print('Sorry, city not found on Craigslist')
     
     elif search_type == 'all':
         for i in range(0,len(cities_list)):
@@ -148,42 +151,9 @@ def doSearch(cities_list, wait_time, search_term, search_target, search_type='al
             
             city_link = cities_list[i].find('a')
             current_city = cities_list[i].text
-            print('Checking {}'.format(current_city))# show what city is being checked
-            if search_target == 'gigs':
-                url =  '{}{}'.format(city_link['href'], gigs_param) # append computer gig parameter to city link
-                search_query = '?query={}&is_paid=all'.format(search_term)
-            else: 
-                url = '{}{}'.format(city_link['href'], web_jobs_param)
-                search_query = '?query={}'.format(search_term)
-            complete_url = '{}{}'.format(url, search_query)
-            info = process_url(complete_url, 'p', 'result-info')
-            get_result_rows(info, current_city)
-            wait_time = random.randint(30, 60) 
-    
-    else:
-        locations = list(map(str, input('Enter cities to check: ').split(', ')))
-        print(locations)
-        for city in locations:
-            city_index = get_city_index(cities_list, city)
-            if city_index: #if city is on craigslist
-                city_link = cities_list[city_index].find('a')
-                current_city = cities_list[city_index].text
-                print('Checking {}'.format(current_city)) # show what city is being checked
-
-                if search_target == 'gigs':
-                    url =  '{}{}'.format(city_link['href'], gigs_param) # append computer gig parameter to city link
-                    search_query = '?query={}&is_paid=all'.format(search_term)
-                else: 
-                    url = '{}{}'.format(city_link['href'], web_jobs_param)
-                    search_query = '?query={}'.format(search_term)
-                complete_url = '{}{}'.format(url, search_query)
-                info = process_url(complete_url, 'p', 'result-info')
-                get_result_rows(info, current_city,'single')
+            process_city(search_target, current_city, city_link, search_term, search_type)
             
-            else: 
-                print('Sorry, city not found on Craigslist')
-    
-
+            wait_time = random.randint(30, 60)
 
 
 ''' Start script '''
