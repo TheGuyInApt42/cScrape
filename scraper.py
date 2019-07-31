@@ -1,6 +1,10 @@
 '''
+Creator: Ralph Gorham
+
 This script allows searching of Craigslist computer gigs either manually searching a specific city 
 or automatically searching every city listed in the US.
+
+Updated 7/27/19
 
 '''
 import argparse
@@ -11,6 +15,8 @@ import time
 import random
 import datetime
 from pymongo import MongoClient
+import smtplib, ssl
+import settings
 
 ap = argparse.ArgumentParser()
 ap.add_argument("-t", "--target", help="flag for searching either gigs or web jobs")
@@ -33,6 +39,7 @@ wait_time = random.randint(30, 60) #set wait time for random time between 30 - 6
 start_endpoint = 'https://www.craigslist.org/about/sites' # Craigslist locations url
 gigs_param = 'd/computer-gigs/search/cpg' # url parameter that gets appended for computer gigs 
 web_jobs_param = 'd/web-html-info-design/search/web' # url parameter that gets appended for web jobs
+software_jobs_param = 'd/software-qa-dba-etc/search/sof' # url parameter for software jobs
 
 
 def process_url(url, tag, className):
@@ -77,12 +84,16 @@ def process_city(target, city, link, term, searchtype):
     if target == 'gigs':
         url =  '{}{}'.format(link['href'], gigs_param) # append computer gig parameter to city link
         search_query = '?query={}&is_paid=all'.format(term)
-    else: 
+    elif target == 'web': 
         url = '{}{}'.format(link['href'], web_jobs_param)
+        search_query = '?query={}'.format(term)
+    else:
+        url = '{}{}'.format(link['href'], software_jobs_param)
         search_query = '?query={}'.format(term)
     complete_url = '{}{}'.format(url, search_query)
     info = process_url(complete_url, 'p', 'result-info')
     get_result_rows(info, city, searchtype)
+    #TODO: add software job search
 
 
 def get_result_rows(results, city, search_type='all'):
@@ -145,6 +156,7 @@ def doSearch(cities_list, wait_time, search_term, search_target, search_type='al
                 print('Sorry, city not found on Craigslist')
     
     elif search_type == 'all':
+        #TODO: maybe add functionality to exclude specific cities
         for i in range(0,len(cities_list)):
             print('Current wait time for next result is {} secs'.format(wait_time))
             time.sleep(wait_time) #wait between 30 - 1 minutes before each
@@ -156,7 +168,30 @@ def doSearch(cities_list, wait_time, search_term, search_target, search_type='al
             wait_time = random.randint(30, 60)
 
 
+
+def emailer():
+    smtp_server = "smtp.gmail.com"
+    port = 587  # For starttls
+    
+    emailTo = 'ralphjgorham@gmail.com'
+    message = 'Subject: Test \n\n This is a test.'
+
+    # Create a secure SSL context
+    context = ssl.create_default_context()
+
+    try:
+        server = smtplib.SMTP(smtp_server, port)
+        server.starttls(context=context)  
+        server.login(settings.EMAIL, settings.PASSWORD)
+        server.sendmail(settings.EMAIL, emailTo, message)
+    except Exception as e:
+        print(e)
+    finally:
+        server.quit()
+
+
 ''' Start script '''
+# emailer()
 data = process_url(start_endpoint, 'div', 'colmask')
 cities = get_cities(data)
 
