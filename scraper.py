@@ -18,6 +18,9 @@ from pymongo import MongoClient
 import smtplib, ssl
 import settings
 
+from lxml import html
+import requests
+
 ap = argparse.ArgumentParser()
 ap.add_argument("-t", "--target", help="flag for searching either gigs or web jobs")
 # add argument var for running manual script
@@ -42,7 +45,7 @@ web_jobs_param = 'd/web-html-info-design/search/web' # url parameter that gets a
 software_jobs_param = 'd/software-qa-dba-etc/search/sof' # url parameter for software jobs
 
 
-def process_url(url, tag, className):
+def process_url(url, objectToFind):
     ''' 
     Processes url and returns a list of a specific tag with certain class, i.e list of all 'divs' with class name 'container'
     Takes a url, HTML tag, class name of tag searching for
@@ -54,8 +57,22 @@ def process_url(url, tag, className):
     content = result.content
 
     soup = BeautifulSoup(content, features='html.parser')
-    return soup.find_all(tag, {'class': className})
+
+    if objectToFind['identifier'] == 'class':
+        data = soup.find_all(objectToFind['tag'], {'class': objectToFind['className']})
+    else:
+        data = soup.find(objectToFind['tag'], id=objectToFind['id_'])
+    return data
     
+
+def xpath(url='https://newyork.craigslist.org/brk/cpg/d/brooklyn-user-testers-for-an-apparel/6942975936.html'):
+    pageContent=requests.get(url)
+    tree = html.fromstring(pageContent.content)
+    test = tree.xpath('//*[@id="postingbody"]/a')
+    print(test)
+
+    return test
+
 
 def get_cities(processed_data):
     '''
@@ -91,12 +108,16 @@ def process_city(target, city, link, term, searchtype):
         url = '{}{}'.format(link['href'], software_jobs_param)
         search_query = '?query={}'.format(term)
     complete_url = '{}{}'.format(url, search_query)
-    info = process_url(complete_url, 'p', 'result-info')
+
+    #FIXME: change name of obj var
+    obj = { "identifier": "class", "tag": "p", "className": "result-info"}
+
+    info = process_url(complete_url, obj)
     get_result_rows(info, city, searchtype)
     #TODO: add software job search
 
 
-def get_result_rows(results, city, search_type='all'):
+def get_result_rows(results, city, search_type='specific'):
     '''
     Checks if there are results and if so, then loops through each result while waiting a random time in between
     Inserts row info into database if it is not already in db
@@ -112,33 +133,52 @@ def get_result_rows(results, city, search_type='all'):
             title = result.find('a').text
             post_id = result.find('a').attrs['data-id']
             link = result.find('a')['href']
+
+            obj = { "identifier": "element", "tag": "section", "id_": "postingbody"}
+
+            #FIXME: work on this
+            p_info = process_url(link, obj) # get post information
+
+            t = xpath(link)
+            
+                
+            #gig object to insert into database
+            gig = {
+                "c_id": post_id,
+                "post_title": title,
+                "city": city,
+                "post_date": post_time,
+                "insert_date": datetime.datetime.utcnow()
+            }
+
+            old_gig = gigs.find_one({'c_id': post_id}) # check if gig is already in database
+            if old_gig:
+                print('This gig is already in database')
+            else:
+                gig_id = gigs.insert_one(gig).inserted_id # insert into database if not in it already
+                print('Gig {} has been inserted into database'.format(gig_id))
+
             if search_type == 'specific':
                 print('Position: {}    Date Posted: {}    Link: {}'.format(title, post_time, link))
-     
-            elif search_type == 'all':
-                #gig object to insert into database
-                gig = {
-                    "c_id": post_id,
-                    "post_title": title,
-                    "city": city,
-                    "post_date": post_time,
-                    "insert_date": datetime.datetime.utcnow()
-                }
+                #print(p_info[2:4])
+                
 
-                old_gig = gigs.find_one({'c_id': post_id}) # check if gig is already in database
-                if old_gig:
-                    print('This gig is already in database')
-                else:
-                    gig_id = gigs.insert_one(gig).inserted_id # insert into database if not in it already
-                    print('Gig {} has been inserted into database'.format(gig_id))
-            
         
     else:
         print('No results found.')
 
+'''
+def postInfo(post_link):
+    result = requests.get(post_link) #load url with random header string
+    content = result.content
+
+    soup = BeautifulSoup(content, features='html.parser')
+    data = soup.find('section', id='postingbody')
+    return data.text
+'''
 
 #TODO: think about adding search params i.e search titles only
-def doSearch(cities_list, wait_time, search_term, search_target, search_type='all'):
+def doSearch(cities_list, wait_time, search_term, search_target, search_type='specific'):
     '''
     Performs either targeted search or automatic search of all cities
     Takes in list of cities, initial wait time, term to search for, and whether search is specific or all
@@ -192,7 +232,9 @@ def emailer():
 
 ''' Start script '''
 # emailer()
-data = process_url(start_endpoint, 'div', 'colmask')
+obj = { "identifier": "class", "tag": "div", "className": "colmask"}
+
+data = process_url(start_endpoint, obj)
 cities = get_cities(data)
 
 
