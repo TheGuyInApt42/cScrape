@@ -37,7 +37,7 @@ db = client.cScrape
 gigs = db.Gigs
 
 
-wait_time = random.randint(30, 60) #set wait time for random time between 30 - 60 secs
+SLEEPTIME = random.randint(3600, 5400) #set sleep time for random time between 60 - 90 minutes
 
 start_endpoint = 'https://www.craigslist.org/about/sites' # Craigslist locations url
 gigs_param = 'd/computer-gigs/search/cpg' # url parameter that gets appended for computer gigs 
@@ -113,8 +113,10 @@ def process_city(target, city, link, term, searchtype):
     obj = { "identifier": "class", "tag": "p", "className": "result-info"}
 
     info = process_url(complete_url, obj)
-    get_result_rows(info, city, searchtype)
+    np = get_result_rows(info, city, searchtype)
     #TODO: add software job search
+
+    return np
 
 
 def get_result_rows(results, city, search_type='specific'):
@@ -123,6 +125,7 @@ def get_result_rows(results, city, search_type='specific'):
     Inserts row info into database if it is not already in db
     Takes in list of rows, current city being processed and whether search type is specific or all
     '''
+    newPosts = []
     wait_time = 5 # wait 5 secs between each iteration (should be on same page so dont have to fire anymore new requests)
     if results:
         print('Found {} results'.format(len(results))) # print number of results
@@ -137,9 +140,9 @@ def get_result_rows(results, city, search_type='specific'):
             obj = { "identifier": "element", "tag": "section", "id_": "postingbody"}
 
             #FIXME: work on this
-            p_info = process_url(link, obj) # get post information
+            #p_info = process_url(link, obj) # get post information
 
-            t = xpath(link)
+            #t = xpath(link)
             
                 
             #gig object to insert into database
@@ -157,6 +160,7 @@ def get_result_rows(results, city, search_type='specific'):
             else:
                 gig_id = gigs.insert_one(gig).inserted_id # insert into database if not in it already
                 print('Gig {} has been inserted into database'.format(gig_id))
+                newPosts.append('Position: {}    Date Posted: {}    Link: {}'.format(title, post_time, link))
 
             if search_type == 'specific':
                 print('Position: {}    Date Posted: {}    Link: {}'.format(title, post_time, link))
@@ -166,6 +170,8 @@ def get_result_rows(results, city, search_type='specific'):
         
     else:
         print('No results found.')
+
+    return newPosts
 
 '''
 def postInfo(post_link):
@@ -178,11 +184,12 @@ def postInfo(post_link):
 '''
 
 #TODO: think about adding search params i.e search titles only
-def doSearch(cities_list, wait_time, search_term, search_target, search_type='specific'):
+def doSearch(cities_list, search_term, search_target, search_type='specific'):
     '''
     Performs either targeted search or automatic search of all cities
     Takes in list of cities, initial wait time, term to search for, and whether search is specific or all
     '''
+    wait_time = random.randint(30, 60)
     if search_type == 'specific':
         locations = list(map(str, input('Enter cities to check: ').split(', ')))
         for city in locations:
@@ -190,7 +197,7 @@ def doSearch(cities_list, wait_time, search_term, search_target, search_type='sp
             if city_index: #if city is on craigslist
                 city_link = cities_list[city_index].find('a')
                 current_city = cities_list[city_index].text
-                process_city(search_target, current_city, city_link, search_term, search_type)
+                np = process_city(search_target, current_city, city_link, search_term, search_type)
             
             else: 
                 print('Sorry, city not found on Craigslist')
@@ -206,15 +213,19 @@ def doSearch(cities_list, wait_time, search_term, search_target, search_type='sp
             process_city(search_target, current_city, city_link, search_term, search_type)
             
             wait_time = random.randint(30, 60)
+    return np
 
 
 
-def emailer():
+def emailer(newPosts):
     smtp_server = "smtp.gmail.com"
     port = 587  # For starttls
     
+    messsage = ''
     emailTo = 'ralphjgorham@gmail.com'
-    message = 'Subject: Test \n\n This is a test.'
+    message = 'Subject: Craigslist Positions \n\n {}'.format(messsage)
+    for post in newPosts:
+        message = message+post+"\n"
 
     # Create a secure SSL context
     context = ssl.create_default_context()
@@ -231,7 +242,6 @@ def emailer():
 
 
 ''' Start script '''
-# emailer()
 obj = { "identifier": "class", "tag": "div", "className": "colmask"}
 
 data = process_url(start_endpoint, obj)
@@ -239,7 +249,10 @@ cities = get_cities(data)
 
 
 search_term = input('Enter search term: ')
-doSearch(cities, wait_time, search_term, args["target"], args["style"])
+posts = doSearch(cities, search_term, args["target"], args["style"])
+print(posts)
+emailer(posts)
+print('Emailing you new results')
 
 # TODO: add progress bar/counter
 # TODO: thinking about multiple search terms i.e ['developer', 'freelance']
