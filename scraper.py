@@ -25,6 +25,7 @@ ap = argparse.ArgumentParser()
 ap.add_argument("-t", "--target", help="flag for searching either gigs or web jobs")
 # add argument var for running manual script
 ap.add_argument("-s", "--style", help="flag to run single, multiple, or all cities search")
+ap.add_argument("-a", "--auto", help="flag to check whether to run auto or manual")
 args = vars(ap.parse_args())
 print("Running {} script on {}".format(args["style"], args["target"]))
 
@@ -113,10 +114,10 @@ def process_city(target, city, link, term, searchtype):
     obj = { "identifier": "class", "tag": "p", "className": "result-info"}
 
     info = process_url(complete_url, obj)
-    np = get_result_rows(info, city, searchtype)
+    newPosts = get_result_rows(info, city, searchtype)
     #TODO: add software job search
 
-    return np
+    return newPosts
 
 
 def get_result_rows(results, city, search_type='specific'):
@@ -197,7 +198,7 @@ def doSearch(cities_list, search_term, search_target, search_type='specific'):
             if city_index: #if city is on craigslist
                 city_link = cities_list[city_index].find('a')
                 current_city = cities_list[city_index].text
-                np = process_city(search_target, current_city, city_link, search_term, search_type)
+                newPosts = process_city(search_target, current_city, city_link, search_term, search_type)
             
             else: 
                 print('Sorry, city not found on Craigslist')
@@ -213,7 +214,7 @@ def doSearch(cities_list, search_term, search_target, search_type='specific'):
             process_city(search_target, current_city, city_link, search_term, search_type)
             
             wait_time = random.randint(30, 60)
-    return np
+    return newPosts
 
 
 
@@ -225,7 +226,7 @@ def emailer(newPosts):
     emailTo = 'ralphjgorham@gmail.com'
     message = 'Subject: Craigslist Positions \n\n {}'.format(messsage)
     for post in newPosts:
-        message = message+post+"\n"
+        message = message+post+"\n\n"
 
     # Create a secure SSL context
     context = ssl.create_default_context()
@@ -242,6 +243,7 @@ def emailer(newPosts):
 
 
 ''' Start script '''
+
 obj = { "identifier": "class", "tag": "div", "className": "colmask"}
 
 data = process_url(start_endpoint, obj)
@@ -250,9 +252,9 @@ cities = get_cities(data)
 
 search_term = input('Enter search term: ')
 posts = doSearch(cities, search_term, args["target"], args["style"])
-print(posts)
-emailer(posts)
-print('Emailing you new results')
 
-# TODO: add progress bar/counter
+if posts:
+    emailer(posts)
+    print('Emailing you new results')
+
 # TODO: thinking about multiple search terms i.e ['developer', 'freelance']
