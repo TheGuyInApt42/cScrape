@@ -14,7 +14,8 @@ from fake_useragent import UserAgent
 import time
 import random
 import datetime
-from pymongo import MongoClient
+import json
+from tinydb import TinyDB, Query
 import smtplib, ssl
 import settings
 
@@ -33,10 +34,9 @@ print("Running {} script on {}".format(args["style"], args["target"]))
 ua = UserAgent() #instantiate user agent object for setting user agent strings
 
 # connect to database
-client = MongoClient()
-db = client.cScrape
-gigs = db.Gigs
-
+db = TinyDB('db.json')
+gigs = db.table('gigs')
+Gig = Query()
 
 SLEEPTIME = random.randint(3600, 5400) #set sleep time for random time between 60 - 90 minutes
 
@@ -73,6 +73,11 @@ def xpath(url='https://newyork.craigslist.org/brk/cpg/d/brooklyn-user-testers-fo
     print(test)
 
     return test
+
+def datetime_handler(x):
+    if isinstance(x, datetime.datetime):
+        return x.isoformat()
+    raise TypeError("Unknown type")
 
 
 def get_cities(processed_data):
@@ -152,15 +157,15 @@ def get_result_rows(results, city, search_type='specific'):
                 "post_title": title,
                 "city": city,
                 "post_date": post_time,
-                "insert_date": datetime.datetime.utcnow()
+                "insert_date": json.dumps(datetime.datetime.utcnow(),default=datetime_handler) # serialize datetime to str
             }
-
-            old_gig = gigs.find_one({'c_id': post_id}) # check if gig is already in database
+            
+            old_gig = gigs.get(Gig.c_id == post_id) # check if gig is already in database
             if old_gig:
                 print('This gig is already in database')
             else:
-                gig_id = gigs.insert_one(gig).inserted_id # insert into database if not in it already
-                print('Gig {} has been inserted into database'.format(gig_id))
+                gigs.insert(gig) # insert into database if not in it already
+                print('Gig {} has been inserted into database'.format(post_id))
                 newPosts.append('Position: {}    Date Posted: {}    Link: {}'.format(title, post_time, link))
 
             if search_type == 'specific':
@@ -217,13 +222,13 @@ def doSearch(cities_list, search_term, locations, search_target, search_type='sp
 
 
 
-def emailer(newPosts):
+def emailer(newPosts, term):
     smtp_server = "smtp.gmail.com"
     port = 587  # For starttls
     
     messsage = ''
     emailTo = 'ralphjgorham@gmail.com'
-    message = 'Subject: Craigslist Positions \n\n {}'.format(messsage)
+    message = 'Subject: Craigslist Positions for {} queries \n\n {}'.format(term, messsage)
     for post in newPosts:
         message = message+post+"\n\n"
 
@@ -254,7 +259,7 @@ if args["auto"] == 'manual':
     posts = doSearch(cities, search_term, locations, args["target"], args["style"])
 
     if posts:
-        emailer(posts)
+        emailer(posts, search_term)
         print('Emailing you new results')
 
 else:
@@ -271,10 +276,9 @@ else:
         posts = doSearch(cities, search_term, locations, args["target"], args["style"])
 
         if posts:
-            emailer(posts)
+            emailer(posts, search_term)
             print('Emailing you new results')
         time.sleep(SLEEPTIME)
-
 
 
 # TODO: thinking about multiple search terms i.e ['developer', 'freelance']
