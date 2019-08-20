@@ -22,11 +22,11 @@ import settings
 from lxml import html
 import requests
 
-ap = argparse.ArgumentParser()
-ap.add_argument("-t", "--target", help="flag for searching either gigs or web jobs")
+ap = argparse.ArgumentParser(description='Craigslist Scraper for computer jobs')
+ap.add_argument("-t", "--target", default="gigs", help="flag for searching either gigs or web jobs (default:gigs)")
 # add argument var for running manual script
-ap.add_argument("-s", "--style", help="flag to run single, multiple, or all cities search")
-ap.add_argument("-a", "--auto", help="flag to check whether to run auto or manual")
+ap.add_argument("-s", "--style", default="specific", help="flag to run single, multiple, or all cities search (default: specific)")
+ap.add_argument("-a", "--auto", default="manual", help="flag to check whether to run auto or manual (default: manual)")
 args = vars(ap.parse_args())
 print("Running {} script on {}".format(args["style"], args["target"]))
 
