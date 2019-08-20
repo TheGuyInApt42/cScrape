@@ -185,14 +185,13 @@ def postInfo(post_link):
 '''
 
 #TODO: think about adding search params i.e search titles only
-def doSearch(cities_list, search_term, search_target, search_type='specific'):
+def doSearch(cities_list, search_term, locations, search_target, search_type='specific'):
     '''
     Performs either targeted search or automatic search of all cities
     Takes in list of cities, initial wait time, term to search for, and whether search is specific or all
     '''
     wait_time = random.randint(30, 60)
     if search_type == 'specific':
-        locations = list(map(str, input('Enter cities to check: ').split(', ')))
         for city in locations:
             city_index = get_city_index(cities_list, city)
             if city_index: #if city is on craigslist
@@ -243,18 +242,39 @@ def emailer(newPosts):
 
 
 ''' Start script '''
+if args["auto"] == 'manual':
+    obj = { "identifier": "class", "tag": "div", "className": "colmask"}
 
-obj = { "identifier": "class", "tag": "div", "className": "colmask"}
-
-data = process_url(start_endpoint, obj)
-cities = get_cities(data)
+    data = process_url(start_endpoint, obj)
+    cities = get_cities(data)
 
 
-search_term = input('Enter search term: ')
-posts = doSearch(cities, search_term, args["target"], args["style"])
+    search_term = input('Enter search term: ')
+    locations = list(map(str, input('Enter cities to check: ').split(', ')))
+    posts = doSearch(cities, search_term, locations, args["target"], args["style"])
 
-if posts:
-    emailer(posts)
-    print('Emailing you new results')
+    if posts:
+        emailer(posts)
+        print('Emailing you new results')
+
+else:
+    print('Hello friend, I am cScrape!')
+    print('I will check Craigslist for new job postings every {:2.0f} minutes'.format(SLEEPTIME/60))
+    search_term = input('Enter search term: ')
+    locations = list(map(str, input('Enter cities to check: ').split(', '))) #TODO: maybe add this as arg var as well as term(s)
+    while args["auto"] == 'auto':
+        obj = { "identifier": "class", "tag": "div", "className": "colmask"}
+
+        data = process_url(start_endpoint, obj)
+        cities = get_cities(data)
+
+        posts = doSearch(cities, search_term, locations, args["target"], args["style"])
+
+        if posts:
+            emailer(posts)
+            print('Emailing you new results')
+        time.sleep(SLEEPTIME)
+
+
 
 # TODO: thinking about multiple search terms i.e ['developer', 'freelance']
