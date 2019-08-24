@@ -19,9 +19,6 @@ from tinydb import TinyDB, Query
 import smtplib, ssl
 import settings
 
-from lxml import html
-import requests
-
 ap = argparse.ArgumentParser(description='Craigslist Scraper for computer jobs')
 ap.add_argument("-t", "--target", default="gigs", help="flag for searching either gigs or web jobs (default:gigs)")
 # add argument var for running manual script
@@ -46,6 +43,17 @@ web_jobs_param = 'd/web-html-info-design/search/web' # url parameter that gets a
 software_jobs_param = 'd/software-qa-dba-etc/search/sof' # url parameter for software jobs
 
 
+def textGet(url):
+    header = {'User-Agent':str(ua.random)} # get random header string
+ 
+    result = requests.get(url, headers=header) #load url with random header string
+    content = result.content
+
+    encoding = result.encoding if 'charset' in result.headers.get('content-type', '').lower() else None
+    soup = BeautifulSoup(content, features='html.parser', from_encoding=encoding)
+    t = soup.get_text()
+    print(t)
+
 def process_url(url, objectToFind):
     ''' 
     Processes url and returns a list of a specific tag with certain class, i.e list of all 'divs' with class name 'container'
@@ -53,11 +61,12 @@ def process_url(url, objectToFind):
     Returns list of bs4 elements that fit the desired criteria
     '''
     header = {'User-Agent':str(ua.random)} # get random header string
-    # print('Header for this request is {}'.format(header))
+ 
     result = requests.get(url, headers=header) #load url with random header string
     content = result.content
 
-    soup = BeautifulSoup(content, features='html.parser')
+    encoding = result.encoding if 'charset' in result.headers.get('content-type', '').lower() else None
+    soup = BeautifulSoup(content, features='html.parser', from_encoding=encoding)
 
     if objectToFind['identifier'] == 'class':
         data = soup.find_all(objectToFind['tag'], {'class': objectToFind['className']})
@@ -66,13 +75,13 @@ def process_url(url, objectToFind):
     return data
     
 
-def xpath(url='https://newyork.craigslist.org/brk/cpg/d/brooklyn-user-testers-for-an-apparel/6942975936.html'):
-    pageContent=requests.get(url)
-    tree = html.fromstring(pageContent.content)
-    test = tree.xpath('//*[@id="postingbody"]/a')
-    print(test)
+def strip(txt):
+    ret = ""
+    for l in txt.split('\n'):
+        if l.strip()!='':
+            ret += l + "\n"
+    return ret
 
-    return test
 
 def datetime_handler(x):
     if isinstance(x, datetime.datetime):
@@ -139,28 +148,32 @@ def get_result_rows(results, city, search_type='specific'):
         for result in results:
             time.sleep(wait_time) 
             post_time = result.find('time').attrs['datetime']
-            title = result.find('a').text
+            title = result.find('a').get_text()
             post_id = result.find('a').attrs['data-id']
             link = result.find('a')['href']
 
             obj = { "identifier": "element", "tag": "section", "id_": "postingbody"}
 
-            #FIXME: work on this
-            #p_info = process_url(link, obj) # get post information
-
-            #t = xpath(link)
+            p_info = process_url(link, obj) # get post information
+            desc = strip(p_info.get_text())
+            desc = desc[desc.find("QR Code Link to This Post")+26:] #ignore the first line regarding QR Code
+            
             
                 
             #gig object to insert into database
             gig = {
                 "c_id": post_id,
                 "post_title": title,
+                "description": desc,
                 "city": city,
                 "post_date": post_time,
                 "insert_date": json.dumps(datetime.datetime.utcnow(),default=datetime_handler) # serialize datetime to str
             }
             
-            old_gig = gigs.get(Gig.c_id == post_id) # check if gig is already in database
+            duplicate_id = gigs.get(Gig.c_id == post_id) # check if craglist id is already in database
+            duplicate_title = gigs.get(Gig.post_title == title) # check if post title is already in database
+            old_gig = True if duplicate_id or duplicate_title else False
+            
             if old_gig:
                 print('This gig is already in database')
             else:
@@ -168,7 +181,7 @@ def get_result_rows(results, city, search_type='specific'):
                 print('Gig {} has been inserted into database'.format(post_id))
                 newPosts.append('Position: {}    Date Posted: {}    Link: {}'.format(title, post_time, link))
 
-            if search_type == 'specific':
+            if search_type == 'specific' and not old_gig:
                 print('Position: {}    Date Posted: {}    Link: {}'.format(title, post_time, link))
                 #print(p_info[2:4])
                 
@@ -179,22 +192,13 @@ def get_result_rows(results, city, search_type='specific'):
 
     return newPosts
 
-'''
-def postInfo(post_link):
-    result = requests.get(post_link) #load url with random header string
-    content = result.content
-
-    soup = BeautifulSoup(content, features='html.parser')
-    data = soup.find('section', id='postingbody')
-    return data.text
-'''
-
 #TODO: think about adding search params i.e search titles only
 def doSearch(cities_list, search_term, locations, search_target, search_type='specific'):
     '''
     Performs either targeted search or automatic search of all cities
     Takes in list of cities, initial wait time, term to search for, and whether search is specific or all
     '''
+    newPosts = []
     wait_time = random.randint(30, 60)
     if search_type == 'specific':
         for city in locations:
@@ -202,7 +206,7 @@ def doSearch(cities_list, search_term, locations, search_target, search_type='sp
             if city_index: #if city is on craigslist
                 city_link = cities_list[city_index].find('a')
                 current_city = cities_list[city_index].text
-                newPosts = process_city(search_target, current_city, city_link, search_term, search_type)
+                newPosts.extend(process_city(search_target, current_city, city_link, search_term, search_type))
             
             else: 
                 print('Sorry, city not found on Craigslist')
@@ -222,13 +226,16 @@ def doSearch(cities_list, search_term, locations, search_target, search_type='sp
 
 
 
-def emailer(newPosts, term):
+def emailer(newPosts, term, locations):
     smtp_server = "smtp.gmail.com"
     port = 587  # For starttls
     
     messsage = ''
     emailTo = 'ralphjgorham@gmail.com'
-    message = 'Subject: Craigslist Positions for {} queries \n\n {}'.format(term, messsage)
+    capitalizer = lambda l: [city.capitalize() for city in l] # capitalize city names
+    capitalizedCities = capitalizer(locations)
+    message = 'Subject: Craigslist Positions for {} queries in {} \n\n {}'.format(term, ', '.join(capitalizedCities), messsage)
+    print(newPosts)
     for post in newPosts:
         message = message+post+"\n\n"
 
@@ -259,7 +266,7 @@ if args["auto"] == 'manual':
     posts = doSearch(cities, search_term, locations, args["target"], args["style"])
 
     if posts:
-        emailer(posts, search_term)
+        emailer(posts, search_term, locations)
         print('Emailing you new results')
 
 else:
@@ -274,11 +281,13 @@ else:
         cities = get_cities(data)
 
         posts = doSearch(cities, search_term, locations, args["target"], args["style"])
+        
 
         if posts:
-            emailer(posts, search_term)
+            emailer(posts, search_term, locations)
             print('Emailing you new results')
         time.sleep(SLEEPTIME)
+        print('Time for me to check again to see if there is anything new!')
 
 
 # TODO: thinking about multiple search terms i.e ['developer', 'freelance']
