@@ -4,7 +4,7 @@ Creator: Ralph Gorham
 This script allows searching of Craigslist computer gigs either manually searching a specific city 
 or automatically searching every city listed in the US.
 
-Updated 7/27/19
+Updated 8/24/19
 
 '''
 import argparse
@@ -129,7 +129,6 @@ def process_city(target, city, link, term, searchtype):
 
     info = process_url(complete_url, obj)
     newPosts = get_result_rows(info, city, searchtype)
-    #TODO: add software job search
 
     return newPosts
 
@@ -235,7 +234,7 @@ def emailer(newPosts, term, locations):
     capitalizer = lambda l: [city.capitalize() for city in l] # capitalize city names
     capitalizedCities = capitalizer(locations)
     message = 'Subject: Craigslist Positions for {} queries in {} \n\n {}'.format(term, ', '.join(capitalizedCities), messsage)
-    print(newPosts)
+    # print(newPosts)
     for post in newPosts:
         message = message+post+"\n\n"
 
