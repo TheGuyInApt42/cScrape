@@ -17,6 +17,8 @@ import datetime
 import json
 from tinydb import TinyDB, Query
 import smtplib, ssl
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 import settings
 
 ap = argparse.ArgumentParser(description='Craigslist Scraper for computer jobs')
@@ -81,6 +83,8 @@ def strip(txt):
         if l.strip()!='':
             ret += l + "\n"
     return ret
+
+fix_ucode = lambda s: s.encode('utf-8', errors='replace').decode('cp1252')
 
 
 def datetime_handler(x):
@@ -148,6 +152,9 @@ def get_result_rows(results, city, search_type='specific'):
             time.sleep(wait_time) 
             post_time = result.find('time').attrs['datetime']
             title = result.find('a').get_text()
+            # print('title as is = {}'.format(title))
+            # fixed_title = fix_ucode(title)
+            #print('fixed title is {}'.format(fixed_title))
             post_id = result.find('a').attrs['data-id']
             link = result.find('a')['href']
 
@@ -182,7 +189,6 @@ def get_result_rows(results, city, search_type='specific'):
 
             if search_type == 'specific' and not old_gig:
                 print('Position: {}    Date Posted: {}    Link: {}'.format(title, post_time, link))
-                #print(p_info[2:4])
                 
 
         
@@ -225,31 +231,44 @@ def doSearch(cities_list, search_term, locations, search_target, search_type='sp
 
 
 
-def emailer(newPosts, term, locations):
+def emailer(newPosts: list, term: str, locations: list):
     smtp_server = "smtp.gmail.com"
     port = 587  # For starttls
-    
-    messsage = ''
+
     emailTo = 'ralphjgorham@gmail.com'
+
     capitalizer = lambda l: [city.capitalize() for city in l] # capitalize city names
     capitalizedCities = capitalizer(locations)
-    message = 'Subject: Craigslist Positions for {} queries in {} \n\n {}'.format(term, ', '.join(capitalizedCities), messsage)
-    # print(newPosts)
+
+    body = ''
+
     for post in newPosts:
-        message = message+post+"\n\n"
+        body = body+post+"\n\n"
+
+    msg = MIMEMultipart('alternative')
+    msg['From'] = settings.EMAIL
+    msg['To'] = emailTo
+    msg['Subject'] = 'Subject: Craigslist Positions for {} queries in {}'.format(term, ', '.join(capitalizedCities))
+    msg_text = MIMEText(body.encode('utf-8'), 'plain', 'utf-8')
+    msg.attach(msg_text)
+    
+    text = msg.as_string()
 
     # Create a secure SSL context
     context = ssl.create_default_context()
 
     try:
-        server = smtplib.SMTP(smtp_server, port)
-        server.starttls(context=context)  
+        server = smtplib.SMTP(smtp_server, port) #Specify Gmail Mail server
+        server.ehlo() #Send mandatory 'hello' message to SMTP server
+        server.starttls(context=context)  #Start TLS Encryption
         server.login(settings.EMAIL, settings.PASSWORD)
-        server.sendmail(settings.EMAIL, emailTo, message)
+        server.sendmail(settings.EMAIL, emailTo, text)
+
     except Exception as e:
         print(e)
     finally:
         server.quit()
+        print('Emailing you new results')
 
 
 ''' Start script '''
@@ -266,7 +285,7 @@ if args["auto"] == 'manual':
 
     if posts:
         emailer(posts, search_term, locations)
-        print('Emailing you new results')
+        
 
 else:
     print('Hello friend, I am cScrape!')
@@ -284,7 +303,6 @@ else:
 
         if posts:
             emailer(posts, search_term, locations)
-            print('Emailing you new results')
         time.sleep(SLEEPTIME)
         print('Time for me to check again to see if there is anything new!')
 
