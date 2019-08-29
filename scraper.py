@@ -4,7 +4,7 @@ Creator: Ralph Gorham
 This script allows searching of Craigslist computer gigs either manually searching a specific city 
 or automatically searching every city listed in the US.
 
-Updated 8/24/19
+Updated 8/29/19
 
 '''
 import argparse
@@ -172,7 +172,7 @@ def get_result_rows(results, city, search_type: str='specific'):
             driver.get(link)
             # time.sleep(time_delay)
             driver.find_element_by_class_name('reply-button').click()
-            driver.implicitly_wait(2)
+            driver.implicitly_wait(3)
             
             reply = driver.find_element_by_class_name('anonemail')
 
@@ -207,7 +207,7 @@ def get_result_rows(results, city, search_type: str='specific'):
                 print('This gig is already in database')
             else:
                 if (desc.find('To apply')) == -1:
-                    emailer.send_reply_email(title)
+                    emailer.send_reply_email(title,reply_email)
                 gigs.insert(gig) # insert into database if not in it already
                 print('Gig {} has been inserted into database'.format(post_id))
                 newPosts.append('Position: {}    Date Posted: {}    Link: {}'.format(title, post_time, link))

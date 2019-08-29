@@ -99,10 +99,4 @@ class Emailer:
         print('Emailing Reply')
 
 
-
-
-
-
-
-
 # if description contains 'to apply', dont send
