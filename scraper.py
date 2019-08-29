@@ -10,6 +10,8 @@ Updated 8/24/19
 import argparse
 from bs4 import BeautifulSoup
 import requests
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options 
 from fake_useragent import UserAgent
 import time
 import random
@@ -20,6 +22,7 @@ import smtplib, ssl
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 import settings
+from Emailer import Emailer as emailer
 
 ap = argparse.ArgumentParser(description='Craigslist Scraper for computer jobs')
 ap.add_argument("-t", "--target", default="gigs", help="flag for searching either gigs or web jobs (default:gigs)")
@@ -38,6 +41,8 @@ gigs = db.table('gigs')
 Gig = Query()
 
 SLEEPTIME = random.randint(3600, 5400) #set sleep time for random time between 60 - 90 minutes
+chrome_options = Options()  
+chrome_options.add_argument("--headless") 
 
 start_endpoint = 'https://www.craigslist.org/about/sites' # Craigslist locations url
 gigs_param = 'd/computer-gigs/search/cpg' # url parameter that gets appended for computer gigs 
@@ -56,7 +61,7 @@ def textGet(url):
     t = soup.get_text()
     print(t)
 
-def process_url(url, objectToFind):
+def process_url(url: str, objectToFind: dict):
     ''' 
     Processes url and returns a list of a specific tag with certain class, i.e list of all 'divs' with class name 'container'
     Takes a url, HTML tag, class name of tag searching for
@@ -137,7 +142,7 @@ def process_city(target, city, link, term, searchtype):
     return newPosts
 
 
-def get_result_rows(results, city, search_type='specific'):
+def get_result_rows(results, city, search_type: str='specific'):
     '''
     Checks if there are results and if so, then loops through each result while waiting a random time in between
     Inserts row info into database if it is not already in db
@@ -145,6 +150,12 @@ def get_result_rows(results, city, search_type='specific'):
     '''
     newPosts = []
     wait_time = 5 # wait 5 secs between each iteration (should be on same page so dont have to fire anymore new requests)
+
+    driver = webdriver.Chrome('chromedriver.exe', chrome_options=chrome_options)
+    # time_delay = random.randint(3,6)
+    time_delay = 2
+    
+
     if results:
         print('Found {} results'.format(len(results))) # print number of results
         print('Current wait time between results is {} seconds'.format(wait_time))
@@ -157,6 +168,18 @@ def get_result_rows(results, city, search_type='specific'):
             #print('fixed title is {}'.format(fixed_title))
             post_id = result.find('a').attrs['data-id']
             link = result.find('a')['href']
+
+            driver.get(link)
+            # time.sleep(time_delay)
+            driver.find_element_by_class_name('reply-button').click()
+            driver.implicitly_wait(2)
+            
+            reply = driver.find_element_by_class_name('anonemail')
+
+            reply_email = ''
+
+            if reply:
+                reply_email = reply.get_attribute('value')
 
             obj = { "identifier": "element", "tag": "section", "id_": "postingbody"}
 
@@ -183,6 +206,8 @@ def get_result_rows(results, city, search_type='specific'):
             if old_gig:
                 print('This gig is already in database')
             else:
+                if (desc.find('To apply')) == -1:
+                    emailer.send_reply_email(title)
                 gigs.insert(gig) # insert into database if not in it already
                 print('Gig {} has been inserted into database'.format(post_id))
                 newPosts.append('Position: {}    Date Posted: {}    Link: {}'.format(title, post_time, link))
@@ -198,7 +223,7 @@ def get_result_rows(results, city, search_type='specific'):
     return newPosts
 
 #TODO: think about adding search params i.e search titles only
-def doSearch(cities_list, search_term, locations, search_target, search_type='specific'):
+def doSearch(cities_list: list, search_term: str, locations, search_target, search_type='specific'):
     '''
     Performs either targeted search or automatic search of all cities
     Takes in list of cities, initial wait time, term to search for, and whether search is specific or all
@@ -231,45 +256,6 @@ def doSearch(cities_list, search_term, locations, search_target, search_type='sp
 
 
 
-def emailer(newPosts: list, term: str, locations: list):
-    smtp_server = "smtp.gmail.com"
-    port = 587  # For starttls
-
-    emailTo = 'ralphjgorham@gmail.com'
-
-    capitalizer = lambda l: [city.capitalize() for city in l] # capitalize city names
-    capitalizedCities = capitalizer(locations)
-
-    body = ''
-
-    for post in newPosts:
-        body = body+post+"\n\n"
-
-    msg = MIMEMultipart('alternative')
-    msg['From'] = settings.EMAIL
-    msg['To'] = emailTo
-    msg['Subject'] = 'Subject: Craigslist Positions for {} queries in {}'.format(term, ', '.join(capitalizedCities))
-    msg_text = MIMEText(body.encode('utf-8'), 'plain', 'utf-8')
-    msg.attach(msg_text)
-    
-    text = msg.as_string()
-
-    # Create a secure SSL context
-    context = ssl.create_default_context()
-
-    try:
-        server = smtplib.SMTP(smtp_server, port) #Specify Gmail Mail server
-        server.ehlo() #Send mandatory 'hello' message to SMTP server
-        server.starttls(context=context)  #Start TLS Encryption
-        server.login(settings.EMAIL, settings.PASSWORD)
-        server.sendmail(settings.EMAIL, emailTo, text)
-
-    except Exception as e:
-        print(e)
-    finally:
-        server.quit()
-        print('Emailing you new results')
-
 
 ''' Start script '''
 if args["auto"] == 'manual':
@@ -284,7 +270,7 @@ if args["auto"] == 'manual':
     posts = doSearch(cities, search_term, locations, args["target"], args["style"])
 
     if posts:
-        emailer(posts, search_term, locations)
+        emailer.send_posts_email(posts, search_term, locations)
         
 
 else:
@@ -302,7 +288,7 @@ else:
         
 
         if posts:
-            emailer(posts, search_term, locations)
+            emailer.send_posts_email(posts, search_term, locations)
         time.sleep(SLEEPTIME)
         print('Time for me to check again to see if there is anything new!')
 
