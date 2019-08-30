@@ -4,7 +4,7 @@ Creator: Ralph Gorham
 This script allows searching of Craigslist computer gigs either manually searching a specific city 
 or automatically searching every city listed in the US.
 
-Updated 8/29/19
+Updated 8/30/19
 
 '''
 import argparse
@@ -18,9 +18,6 @@ import random
 import datetime
 import json
 from tinydb import TinyDB, Query
-import smtplib, ssl
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
 import settings
 from Emailer import Emailer as emailer
 
