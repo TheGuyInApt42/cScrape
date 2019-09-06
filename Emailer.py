@@ -12,6 +12,7 @@ class Emailer:
         pass
 
     @staticmethod
+    # TODO: send email sorted by most recent postings?
     def send_posts_email(newPosts: list, term: str, locations: list):
         smtp_server = "smtp.gmail.com"
         port = 587  # For starttls
@@ -24,6 +25,7 @@ class Emailer:
         body = ''
 
         for post in newPosts:
+            print(post)
             body = body+post+"\n\n"
 
         msg = MIMEMultipart('alternative')

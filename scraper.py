@@ -12,6 +12,7 @@ from bs4 import BeautifulSoup
 import requests
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options 
+from selenium.common.exceptions import NoSuchElementException
 from fake_useragent import UserAgent
 import time
 import random
@@ -166,17 +167,23 @@ def get_result_rows(results, city, search_type: str='specific'):
             post_id = result.find('a').attrs['data-id']
             link = result.find('a')['href']
 
+            reply_email = ''
+            reply = None
+
             driver.get(link)
             # time.sleep(time_delay)
-            driver.find_element_by_class_name('reply-button').click()
-            driver.implicitly_wait(3)
+            try:
+                driver.find_element_by_class_name('reply-button').click()
+                driver.implicitly_wait(3)
             
-            reply = driver.find_element_by_class_name('anonemail')
+                reply = driver.find_element_by_class_name('anonemail')
 
-            reply_email = ''
-
-            if reply:
-                reply_email = reply.get_attribute('value')
+                if reply:
+                    reply_email = reply.get_attribute('value')
+            
+            except NoSuchElementException: # FIXME: can do more here
+                reply_email = 'ralphjgorham@gmail.com'
+   
 
             obj = { "identifier": "element", "tag": "section", "id_": "postingbody"}
 
@@ -207,7 +214,7 @@ def get_result_rows(results, city, search_type: str='specific'):
                     emailer.send_reply_email(title,reply_email)
                 gigs.insert(gig) # insert into database if not in it already
                 print('Gig {} has been inserted into database'.format(post_id))
-                newPosts.append('Position: {}    Date Posted: {}    Link: {}'.format(title, post_time, link))
+                newPosts.append('Position: {}    Date Posted: {}    Link: {}'.format(title, post_time, link)) #FIXME: make this a dict instead of str to be able to sort
 
             if search_type == 'specific' and not old_gig:
                 print('Position: {}    Date Posted: {}    Link: {}'.format(title, post_time, link))
@@ -268,6 +275,7 @@ if args["auto"] == 'manual':
 
     if posts:
         emailer.send_posts_email(posts, search_term, locations)
+    print('') #print empty line b/c output looks cluttered
         
 
 else:

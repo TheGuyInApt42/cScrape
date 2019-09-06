@@ -49,6 +49,10 @@ for el in g:
         print('error')
 '''
 
+def find_doc(table, fieldname: str, query: str):
+    doc = table.search(Gig.fieldname == query)
+    print(Gig)
+    print(doc)
 
 def db_size(db):
     print(len(db))
@@ -59,5 +63,5 @@ def print_all(db_table):
         row['description'] = unicode_fix(row['description'])
         print(row.doc_id, row)
 
-print_all(gigs)
+find_doc(gigs, 'c_id', '6946199300')
 
