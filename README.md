@@ -1,6 +1,6 @@
 # cScrape
 
-A script to check computer gigs in each city listed on Craigslist either automatically or manually selecting a city.
+A script to check computer gigs or web jobs in each city listed on Craigslist for a specific search term. The script can check every US city automatically or it can be given a specific city or list of cities.
 
 The script primarily uses BeautifulSoup and requests. It also uses PyMongo to store unique gigs in database. 
 

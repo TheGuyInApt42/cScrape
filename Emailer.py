@@ -13,11 +13,9 @@ class Emailer:
 
     @staticmethod
     # TODO: send email sorted by most recent postings?
-    def send_posts_email(newPosts: list, term: str, locations: list):
+    def send_posts_email(newPosts: list, term: str, locations: list, emailTo: str = 'ralphjgorham@gmail.com'):
         smtp_server = "smtp.gmail.com"
         port = 587  # For starttls
-
-        emailTo = 'ralphjgorham@gmail.com'
 
         capitalizer = lambda l: [city.capitalize() for city in l] # capitalize city names
         capitalizedCities = capitalizer(locations)

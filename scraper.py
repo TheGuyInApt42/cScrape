@@ -96,6 +96,22 @@ def datetime_handler(x):
     raise TypeError("Unknown type")
 
 
+def process_state(state: str, search_term, search_target, search_type):
+    newPosts = []
+    list_of_states = {"identifier": "class", "tag": "h4", "className": ""}
+    states = process_url(start_endpoint, list_of_states)
+    for place in states:
+        if place.text == state:
+            cities = place.find_next_sibling('ul')
+            for city in cities:
+                if(city.find('a')) != -1:
+                    time.sleep(20)
+                    city_link = city.find('a')
+                    current_city = city.text
+                    newPosts.extend(process_city(search_target, current_city, city_link, search_term, search_type))
+            
+
+
 def get_cities(processed_data):
     '''
     Gets all US cities links Returns list of line tags of all US cities
@@ -210,8 +226,10 @@ def get_result_rows(results, city, search_type: str='specific'):
             if old_gig:
                 print('This gig is already in database')
             else:
+                '''
                 if (desc.find('To apply')) == -1:
                     emailer.send_reply_email(title,reply_email)
+                '''
                 gigs.insert(gig) # insert into database if not in it already
                 print('Gig {} has been inserted into database'.format(post_id))
                 newPosts.append('Position: {}    Date Posted: {}    Link: {}'.format(title, post_time, link)) #FIXME: make this a dict instead of str to be able to sort
@@ -265,6 +283,19 @@ def doSearch(cities_list: list, search_term: str, locations, search_target, sear
 if args["auto"] == 'manual':
     obj = { "identifier": "class", "tag": "div", "className": "colmask"}
 
+    emailTo = input('What is your email address: ')
+    search_term = input('Enter search term: ')
+    place = input('Enter state: ')
+    posts = process_state(place, search_term, args["target"], args["style"])
+
+    if posts:
+        emailer.send_posts_email(posts, search_term, place)
+    print('') #print empty line b/c output looks cluttered
+    
+    
+    
+
+    '''
     data = process_url(start_endpoint, obj)
     cities = get_cities(data)
 
@@ -276,6 +307,7 @@ if args["auto"] == 'manual':
     if posts:
         emailer.send_posts_email(posts, search_term, locations)
     print('') #print empty line b/c output looks cluttered
+    '''
         
 
 else:
@@ -299,3 +331,6 @@ else:
 
 
 # TODO: thinking about multiple search terms i.e ['developer', 'freelance']
+# TODO: think about soring results by date
+
+# TODO: add input for email address to send to
